@@ -20,15 +20,46 @@ void updatePixelsDensityAware()
 
 float circleSDF(PVector p, PVector center, float r)
 {
-  return p.dist(center) <= r;
+  return p.dist(center) - r;
 }
 
+float circleSDFN(PVector p, PVector center, float r)
+{
+  return -circleSDF(p, center, r) / r;
+}
+
+float cloudsVolume(PVector p)
+{
+  float cloudsSDF = max(circleSDFN(p, PVector{}, .1), max(circleSDFN(p, PVector{-.11, 0.}, .08), circleSDFN(p, PVector{.13, 0.}, .06)));
+  cloudsSDF = MH::saturate((cloudsSDF + 2.5) * .2);
+  
+  float noiseScale;
+  
+  // High frequency details
+  noiseScale = 2;
+  noiseDetail(4, 0.2);
+  PVector hfP = p - PVector{5., 5., 5.};
+  float hfClouds = noise(hfP.x * noiseScale, hfP.y * noiseScale, hfP.z * noiseScale);
+  
+  // Low frequency details
+  noiseScale = 10;
+  noiseDetail(8, 0.4);
+  PVector lfP = p + PVector{200., 200., 200.};
+  float lfClouds = noise(lfP.x * noiseScale, lfP.y * noiseScale, lfP.z * noiseScale);
+  
+  return MH::saturate((hfClouds - .8) * .6 + (lfClouds - .2) * .4 + cloudsSDF * .75);
+}
+PVector skyColor(PVector p)
+{
+  PVector skyColorBase{102, 165, 242};
+  PVector skyColorSecondary{200, 200, 250};
+
+  return -(-0.5 + p.y) * skyColorSecondary + (.5 + p.y) * skyColorBase;
+}
 color paint(PVector p)
 {
-  PVector skyColor{102, 165, 242};
   PVector cloudColor{255, 255, 255};
-  float cloudsShape = circleSDF(p, PVector{}, .1) + circleSDF(p, PVector{-.11, 0.}, .08) + circleSDF(p, PVector{.13, 0.}, .06);
-  PVector result = skyColor + cloudColor * cloudsShape;
+  PVector result = skyColor(p) + cloudColor * cloudsVolume(p);
   
   return color{result.x, result.y, result.z};
 }
